@@ -1,784 +1,1446 @@
+
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-  <title>Camera App</title>
-  <style>
-    :root{
-      --bar-h: 132px;
-      --btn: 86px;
-      --small-btn: 46px;
-      --side: 18px;
-      --swap-dur: 360ms;
-      --zoom-dur: 180ms;
-    }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#10131c">
+<title>DelayCam - 遅延カメラ</title>
 
-    *{
-      box-sizing: border-box;
-      -webkit-tap-highlight-color: transparent;
-    }
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #10131c;
+  --panel: #191e2b;
+  --panel2: #222a3a;
+  --border: #313b50;
+  --text: #edf2ff;
+  --muted: #9ba8c1;
+  --accent: #70a7ff;
+  --green: #65e6ae;
+  --red: #ff7185;
+}
 
-    html, body{
-      margin: 0;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background: #000;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      user-select: none;
-      -webkit-user-select: none;
-      touch-action: none;
-    }
+* {
+  box-sizing: border-box;
+}
 
-    #app{
-      position: relative;
-      width: 100%;
-      height: 100%;
-      background: #000;
-      display: flex;
-      flex-direction: column;
-    }
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(ellipse at top left, #202d48 0%, transparent 48%),
+    var(--bg);
+  color: var(--text);
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "Noto Sans JP", sans-serif;
+}
 
-    #viewport{
-      position: relative;
-      flex: 1;
-      background: #000;
-      overflow: hidden;
-    }
+button,
+input,
+select {
+  font: inherit;
+}
 
-    #camera{
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      background: #000;
-      transform-origin: center center;
-      transition: transform var(--zoom-dur) ease;
-    }
+button,
+select,
+input {
+  color: var(--text);
+}
 
-    #gestureLayer{
-      position: absolute;
-      inset: 0;
-      z-index: 5;
-      touch-action: none;
-    }
+button,
+select {
+  cursor: pointer;
+}
 
-    #topHud{
-      position: absolute;
-      top: 12px;
-      left: 12px;
-      right: 12px;
-      z-index: 10;
-      display: flex;
-      align-items: flex-start;
-      justify-content: flex-end;
-      gap: 8px;
-      pointer-events: none;
-    }
+button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
 
-    .pill{
-      padding: 8px 12px;
-      border-radius: 999px;
-      background: rgba(0,0,0,.45);
-      color: #fff;
-      font-size: 13px;
-      line-height: 1;
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-      border: 1px solid rgba(255,255,255,.12);
-      pointer-events: auto;
-    }
+.page {
+  width: min(1050px, 100%);
+  margin: 0 auto;
+  padding: 26px 18px 36px;
+}
 
-    .pillButton{
-      cursor: pointer;
-    }
+header {
+  margin-bottom: 22px;
+}
 
-    #zoomPill{
-      position: absolute;
-      top: 12px;
-      left: 12px;
-      z-index: 11;
-      pointer-events: auto;
-      opacity: 1;
-      transform: translateY(0);
-      transition: transform 180ms ease, opacity 180ms ease;
-    }
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
 
-    #zoomPill.flash{
-      transform: scale(1.08);
-    }
+.logo {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  border-radius: 15px;
+  background: linear-gradient(135deg, #70a7ff, #8577ff);
+  color: #10131c;
+  font-size: 25px;
+  font-weight: 900;
+}
 
-    #controls{
-      position: relative;
-      height: var(--bar-h);
-      background: #000;
-      overflow: hidden;
-      border-top: 1px solid rgba(255,255,255,.06);
-    }
+h1 {
+  margin: 0;
+  font-size: clamp(23px, 5vw, 34px);
+  letter-spacing: -0.8px;
+}
 
-    .controlBtn{
-      position: absolute;
-      bottom: 22px;
-      width: var(--btn);
-      height: var(--btn);
-      border-radius: 50%;
-      border: none;
-      outline: none;
-      z-index: 3;
-      transition:
-        left var(--swap-dur) cubic-bezier(.2,.9,.2,1),
-        transform 120ms ease,
-        box-shadow 120ms ease,
-        opacity 120ms ease;
-      box-shadow: 0 8px 22px rgba(0,0,0,.4);
-      touch-action: manipulation;
-    }
+.subtitle {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
 
-    .controlBtn:active{
-      transform: scale(.94);
-    }
+.panel {
+  padding: 19px;
+  margin-bottom: 16px;
+  background: color-mix(in srgb, var(--panel) 94%, transparent);
+  border: 1px solid var(--border);
+  border-radius: 19px;
+  box-shadow: 0 12px 35px #0002;
+}
 
-    #videoBtn{
-      left: var(--side);
-      background: #ff2f2f;
-      box-shadow: 0 0 0 4px rgba(255,47,47,.12), 0 8px 22px rgba(0,0,0,.4);
-    }
+.panel-title {
+  margin: 0 0 16px;
+  font-size: 16px;
+  font-weight: 750;
+}
 
-    #photoBtn{
-      left: calc(100% - var(--side) - var(--btn));
-      background: #fff;
-      box-shadow: 0 0 0 4px rgba(255,255,255,.12), 0 8px 22px rgba(0,0,0,.4);
-    }
+.screen {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 230px;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at center, #1d2739, #080b12 78%);
+  border: 1px solid #344057;
+  border-radius: 16px;
+}
 
-    #switchBtn{
-      position: absolute;
-      left: 50%;
-      bottom: 31px;
-      transform: translateX(-50%);
-      width: var(--small-btn);
-      height: var(--small-btn);
-      border-radius: 50%;
-      border: none;
-      z-index: 4;
-      background: rgba(255,255,255,.10);
-      color: #fff;
-      font-size: 18px;
-      line-height: 1;
-      box-shadow: 0 8px 20px rgba(0,0,0,.35);
-      border: 1px solid rgba(255,255,255,.12);
-      touch-action: manipulation;
-    }
+#outputCanvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 65vh;
+  object-fit: contain;
+}
 
-    #switchBtn:active{
-      transform: translateX(-50%) scale(.94);
-    }
+.placeholder {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  text-align: center;
+  background: #0b0e16d9;
+}
 
-    #videoBtn.recording{
-      animation: pulse 1s infinite;
-    }
+.screen.has-image .placeholder {
+  display: none;
+}
 
-    @keyframes pulse{
-      0%   { box-shadow: 0 0 0 0 rgba(255,47,47,.45), 0 8px 22px rgba(0,0,0,.4); }
-      70%  { box-shadow: 0 0 0 16px rgba(255,47,47,0), 0 8px 22px rgba(0,0,0,.4); }
-      100% { box-shadow: 0 0 0 0 rgba(255,47,47,0), 0 8px 22px rgba(0,0,0,.4); }
-    }
+.placeholder-icon {
+  margin-bottom: 12px;
+  font-size: 38px;
+}
 
-    .innerDot{
-      position: absolute;
-      inset: 0;
-      margin: auto;
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      background: transparent;
-      transition: all 180ms ease;
-    }
+.placeholder strong {
+  font-size: 16px;
+}
 
-    #videoBtn .innerDot{
-      width: 28px;
-      height: 28px;
-      background: #fff;
-      border-radius: 10px;
-    }
+.placeholder p {
+  max-width: 360px;
+  margin: 9px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
 
-    #videoBtn.recording .innerDot{
-      width: 24px;
-      height: 24px;
-      border-radius: 6px;
-      background: #fff;
-    }
+.live-badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 3;
+  display: none;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 10px;
+  border: 1px solid #ffffff24;
+  border-radius: 99px;
+  background: #10131cd9;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+}
 
-    #photoBtn .innerDot{
-      width: 24px;
-      height: 24px;
-      border: 4px solid #111;
-      background: transparent;
-      border-radius: 50%;
-    }
+.screen.has-image .live-badge {
+  display: flex;
+}
 
-    #message{
-      position: absolute;
-      left: 50%;
-      top: 50%;
-      transform: translate(-50%, -50%);
-      z-index: 20;
-      max-width: 88%;
-      padding: 14px 16px;
-      border-radius: 16px;
-      background: rgba(0,0,0,.68);
-      color: #fff;
-      text-align: center;
-      font-size: 14px;
-      line-height: 1.5;
-      border: 1px solid rgba(255,255,255,.10);
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 180ms ease;
-    }
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 8px #65e6ae80;
+}
 
-    #message.show{
-      opacity: 1;
-    }
+.statusbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
 
-    #hiddenCanvas{
-      display: none;
-    }
-  </style>
+.statusbar span {
+  overflow-wrap: anywhere;
+}
+
+#status {
+  color: var(--green);
+}
+
+.controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 15px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.field label {
+  color: #dce5f8;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.field select,
+.field input {
+  width: 100%;
+  min-width: 0;
+  min-height: 46px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--panel2);
+  outline: none;
+}
+
+.field select:focus,
+.field input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px #70a7ff20;
+}
+
+.field input[type="number"] {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.input-unit {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.input-unit input {
+  flex: 1;
+  width: 0;
+}
+
+.unit {
+  min-width: 68px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.action-btn {
+  min-height: 49px;
+  padding: 12px 15px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  font-weight: 800;
+  transition: filter 0.15s, transform 0.15s;
+}
+
+.action-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.primary {
+  background: linear-gradient(135deg, #70a7ff, #9181ff);
+  color: #10131c;
+}
+
+.secondary {
+  background: #272e3d;
+  border-color: #3b455a;
+}
+
+.action-btn:hover:not(:disabled) {
+  filter: brightness(1.12);
+}
+
+.note {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-top: 15px;
+  padding: 13px 14px;
+  border: 1px solid #354158;
+  border-radius: 12px;
+  background: #151b28;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.note-icon {
+  flex-shrink: 0;
+  font-size: 16px;
+}
+
+footer {
+  padding: 5px 4px;
+  color: #77839b;
+  font-size: 11px;
+  line-height: 1.7;
+  text-align: center;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+@media (max-width: 520px) {
+  .page {
+    padding: 19px 12px 28px;
+  }
+
+  .panel {
+    padding: 15px;
+    border-radius: 16px;
+  }
+
+  .controls {
+    grid-template-columns: 1fr;
+    gap: 13px;
+  }
+
+  .screen {
+    min-height: 210px;
+  }
+
+  .actions {
+    gap: 8px;
+  }
+
+  .action-btn {
+    padding: 11px 8px;
+    font-size: 13px;
+  }
+}
+</style>
 </head>
-<body>
-  <div id="app">
-    <div id="viewport">
-      <video id="camera" autoplay playsinline muted></video>
-      <div id="gestureLayer"></div>
 
-      <div id="topHud">
-        <div class="pill pillButton" id="memorySaveBtn">メモリ保存 0</div>
+<body>
+<main class="page">
+
+  <header>
+    <div class="brand">
+      <div class="logo">D</div>
+      <div>
+        <h1>DelayCam</h1>
+        <p class="subtitle">リアルタイム映像を、指定時間だけ遅らせる。</p>
+      </div>
+    </div>
+  </header>
+
+  <section class="panel">
+    <h2 class="panel-title">遅延映像</h2>
+
+    <div class="screen" id="screen">
+      <canvas id="outputCanvas" width="2" height="2"></canvas>
+
+      <div class="placeholder" id="placeholder">
+        <div class="placeholder-icon">📷</div>
+        <strong id="placeholderTitle">カメラを起動しよう</strong>
+        <p id="placeholderText">
+          「カメラを開始」を押すと、指定した遅延時間の映像が表示されるよ。
+        </p>
       </div>
 
-      <div class="pill" id="zoomPill">x1</div>
-      <div id="message"></div>
+      <div class="live-badge">
+        <span class="dot"></span>
+        DELAY OUTPUT
+      </div>
     </div>
 
-    <div id="controls">
-      <button id="videoBtn" class="controlBtn" aria-label="動画の開始と停止">
-        <span class="innerDot"></span>
+    <div class="statusbar">
+      <span id="status">準備完了</span>
+      <span id="stats">バッファ：0 フレーム</span>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2 class="panel-title">遅延設定</h2>
+
+    <div class="controls">
+
+      <div class="field">
+        <label for="delayMode">遅延の指定方法</label>
+        <select id="delayMode">
+          <option value="seconds">秒数で指定</option>
+          <option value="frames">フレーム数で指定</option>
+        </select>
+      </div>
+
+      <div class="field" id="secondsField">
+        <label for="delaySeconds">遅延時間</label>
+        <div class="input-unit">
+          <input
+            id="delaySeconds"
+            type="number"
+            min="0"
+            max="30"
+            step="0.1"
+            value="2"
+            inputmode="decimal">
+          <span class="unit">秒</span>
+        </div>
+      </div>
+
+      <div class="field" id="framesField" hidden>
+        <label for="delayFrames">遅延フレーム数</label>
+        <div class="input-unit">
+          <input
+            id="delayFrames"
+            type="number"
+            min="0"
+            max="1800"
+            step="1"
+            value="60"
+            inputmode="numeric">
+          <span class="unit">フレーム</span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="captureFps">取得FPSの上限</label>
+        <select id="captureFps">
+          <option value="5">5 FPS</option>
+          <option value="10">10 FPS</option>
+          <option value="15">15 FPS</option>
+          <option value="24">24 FPS</option>
+          <option value="30" selected>30 FPS</option>
+          <option value="60">60 FPS</option>
+        </select>
+        <p class="hint">
+          端末やカメラの性能によって、実際のFPSは下がることがあるよ。
+        </p>
+      </div>
+
+      <div class="field">
+        <label for="imageSize">保存する画像サイズ</label>
+        <select id="imageSize">
+          <option value="360">低（最大360px）</option>
+          <option value="480" selected>標準（最大480px）</option>
+          <option value="640">高（最大640px）</option>
+        </select>
+        <p class="hint">
+          大きいほど映像は鮮明になるけど、処理負荷も上がるよ。
+        </p>
+      </div>
+
+      <div class="field">
+        <label for="cameraSelect">使用するカメラ</label>
+        <select id="cameraSelect">
+          <option value="">既定のカメラ</option>
+        </select>
+      </div>
+
+    </div>
+
+    <div class="actions">
+      <button class="action-btn primary" id="startButton">
+        カメラを開始
       </button>
-
-      <button id="switchBtn" aria-label="前後カメラを切り替え">⇄</button>
-
-      <button id="photoBtn" class="controlBtn" aria-label="写真を撮る">
-        <span class="innerDot"></span>
+      <button class="action-btn secondary" id="stopButton" disabled>
+        カメラを停止
       </button>
     </div>
 
-    <canvas id="hiddenCanvas"></canvas>
-  </div>
+    <div class="note">
+      <span class="note-icon">ⓘ</span>
+      <span>
+        秒指定では過去の取得時刻を基準に表示するよ。
+        フレーム指定では、取得した画像を数えて指定枚数ぶん遅らせるよ。
+        そのため、例えば60フレームの遅延が何秒になるかは実際の取得FPS次第。
+        指定した遅延ぶんの映像が蓄積するまでは、表示が始まらないよ。
+      </span>
+    </div>
+  </section>
 
-  <script>
-    const video = document.getElementById('camera');
-    const gestureLayer = document.getElementById('gestureLayer');
-    const controls = document.getElementById('controls');
-    const videoBtn = document.getElementById('videoBtn');
-    const photoBtn = document.getElementById('photoBtn');
-    const switchBtn = document.getElementById('switchBtn');
-    const zoomPill = document.getElementById('zoomPill');
-    const messageBox = document.getElementById('message');
-    const hiddenCanvas = document.getElementById('hiddenCanvas');
-    const memorySaveBtn = document.getElementById('memorySaveBtn');
+  <footer>
+    DelayCam · 映像処理はこのブラウザ内で実行されます。<br>
+    カメラ映像・画像データを外部サーバーへ送信する機能はありません。
+  </footer>
 
-    let stream = null;
-    let mediaRecorder = null;
-    let recordedChunks = [];
-    let isRecording = false;
+</main>
 
-    let swapped = false;
-    let currentFacing = 'environment';
+<!-- カメラ映像の取得専用。画面には直接表示しない -->
+<video
+  id="sourceVideo"
+  autoplay
+  muted
+  playsinline
+  aria-hidden="true"
+  style="
+    position:fixed;
+    left:-10000px;
+    top:0;
+    width:1px;
+    height:1px;
+    opacity:0;
+    pointer-events:none;
+  ">
+</video>
 
-    const zoomLevels = [0.5, 1, 2, 3, 4, 5, 6, 7, 8];
-    let currentZoom = 1;
+<!-- フレームを縮小して保存するための内部キャンバス -->
+<canvas
+  id="captureCanvas"
+  width="2"
+  height="2"
+  style="display:none">
+</canvas>
 
-    let activeTrack = null;
-    let supportsTrackZoom = false;
-    let hardwareZoomMin = 1;
-    let hardwareZoomMax = 1;
-    let hardwareZoomAvailable = false;
+<script>
+"use strict";
 
-    let swipeStartX = 0;
-    let swipeStartY = 0;
-    let controlsSwipeActive = false;
-    let controlsSwipeLocked = false;
+(() => {
+  const $ = id => document.getElementById(id);
 
-    const memoryItems = []; // { kind, blob, filename, type }
+  const screen = $("screen");
+  const placeholderTitle = $("placeholderTitle");
+  const placeholderText = $("placeholderText");
+  const statusElement = $("status");
+  const statsElement = $("stats");
 
-    function showMessage(text, ms = 2200){
-      messageBox.textContent = text;
-      messageBox.classList.add('show');
-      clearTimeout(showMessage._t);
-      showMessage._t = setTimeout(() => messageBox.classList.remove('show'), ms);
+  const delayMode = $("delayMode");
+  const delaySeconds = $("delaySeconds");
+  const delayFrames = $("delayFrames");
+  const secondsField = $("secondsField");
+  const framesField = $("framesField");
+
+  const captureFps = $("captureFps");
+  const imageSize = $("imageSize");
+  const cameraSelect = $("cameraSelect");
+
+  const startButton = $("startButton");
+  const stopButton = $("stopButton");
+
+  const video = $("sourceVideo");
+  const outputCanvas = $("outputCanvas");
+  const outputContext = outputCanvas.getContext("2d", {
+    alpha: false
+  });
+
+  const captureCanvas = $("captureCanvas");
+  const captureContext = captureCanvas.getContext("2d", {
+    alpha: false
+  });
+
+  let stream = null;
+  let running = false;
+  let sessionId = 0;
+
+  let frames = [];
+  let nextFrameIndex = 0;
+  let bufferEpoch = 0;
+
+  let captureInProgress = false;
+  let lastCaptureAt = 0;
+
+  let videoFrameCallbackId = null;
+  let captureAnimationFrameId = null;
+  let renderAnimationFrameId = null;
+
+  let lastObservedVideoTime = -1;
+  let desiredTarget = null;
+  let displayedIndex = -1;
+  let decodeBusy = false;
+
+  let lastStatusUpdate = 0;
+
+  function clampNumber(input, min, max, fallback) {
+    const n = Number(input.value);
+
+    if (!Number.isFinite(n)) {
+      return fallback;
     }
 
-    function flashZoom(){
-      zoomPill.classList.add('flash');
-      clearTimeout(flashZoom._t);
-      flashZoom._t = setTimeout(() => zoomPill.classList.remove('flash'), 160);
+    return Math.max(min, Math.min(max, n));
+  }
+
+  function currentDelayDescription() {
+    if (delayMode.value === "frames") {
+      return `${clampNumber(delayFrames, 0, 1800, 60)} フレーム遅延`;
     }
 
-    function formatZoom(z){
-      return Number.isInteger(z) ? String(z) : z.toFixed(1).replace(/\.0$/, '');
+    return `${clampNumber(delaySeconds, 0, 30, 2).toFixed(1)} 秒遅延`;
+  }
+
+  function setPlaceholder(title, text) {
+    placeholderTitle.textContent = title;
+    placeholderText.textContent = text;
+  }
+
+  function setStatus(text, isError = false) {
+    statusElement.textContent = text;
+    statusElement.style.color = isError
+      ? "var(--red)"
+      : "var(--green)";
+  }
+
+  function resetOutput() {
+    screen.classList.remove("has-image");
+
+    outputCanvas.width = 2;
+    outputCanvas.height = 2;
+
+    displayedIndex = -1;
+    desiredTarget = null;
+  }
+
+  function resetFrameBuffer() {
+    bufferEpoch++;
+    frames = [];
+    resetOutput();
+
+    setPlaceholder(
+      running ? "映像を準備中…" : "カメラを起動しよう",
+      running
+        ? "設定した遅延時間ぶんの映像を蓄積しています。"
+        : "「カメラを開始」を押すと、指定した遅延時間の映像が表示されるよ。"
+    );
+  }
+
+  function configureCaptureCanvas() {
+    if (!video.videoWidth || !video.videoHeight) {
+      return;
     }
 
-    function updateZoomLabel(){
-      zoomPill.textContent = `x${formatZoom(currentZoom)}`;
-      flashZoom();
+    const maxSide = Number(imageSize.value) || 480;
+
+    const scale = Math.min(
+      1,
+      maxSide / Math.max(video.videoWidth, video.videoHeight)
+    );
+
+    const width = Math.max(
+      2,
+      Math.round(video.videoWidth * scale)
+    );
+
+    const height = Math.max(
+      2,
+      Math.round(video.videoHeight * scale)
+    );
+
+    captureCanvas.width = width;
+    captureCanvas.height = height;
+  }
+
+  function getBufferLimit() {
+    const fps = Number(captureFps.value) || 30;
+
+    if (delayMode.value === "frames") {
+      const count = clampNumber(
+        delayFrames,
+        0,
+        1800,
+        60
+      );
+
+      return Math.min(2000, count + 10);
     }
 
-    function updateZoomVisual(){
-      updateZoomLabel();
+    const seconds = clampNumber(
+      delaySeconds,
+      0,
+      30,
+      2
+    );
 
-      if (!hardwareZoomAvailable || currentZoom < hardwareZoomMin || currentZoom > hardwareZoomMax){
-        video.style.transform = `scale(${currentZoom})`;
-      }else{
-        video.style.transform = 'none';
-      }
+    // 指定秒数より少し長く保持し、遅延映像を選べるようにする。
+    return Math.min(
+      2000,
+      Math.ceil((seconds + 1) * fps) + 5
+    );
+  }
+
+  function pruneBuffer() {
+    const limit = Math.max(10, getBufferLimit());
+
+    while (frames.length > limit) {
+      frames.shift();
+    }
+  }
+
+  function captureFrame(mySession) {
+    if (
+      !running ||
+      mySession !== sessionId ||
+      captureInProgress ||
+      video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA
+    ) {
+      return;
     }
 
-    function getNextZoom(direction){
-      const idx = zoomLevels.findIndex(v => Math.abs(v - currentZoom) < 0.001);
-      if (idx !== -1){
-        if (direction === 'up') return zoomLevels[Math.min(zoomLevels.length - 1, idx + 1)];
-        return zoomLevels[Math.max(0, idx - 1)];
-      }
+    if (!video.videoWidth || !video.videoHeight) {
+      return;
+    }
 
-      let nearest = 0;
-      let best = Infinity;
-      for (let i = 0; i < zoomLevels.length; i++){
-        const d = Math.abs(zoomLevels[i] - currentZoom);
-        if (d < best){
-          best = d;
-          nearest = i;
+    captureInProgress = true;
+
+    const epochAtCapture = bufferEpoch;
+    const capturedAt = performance.now();
+
+    try {
+      captureContext.drawImage(
+        video,
+        0,
+        0,
+        captureCanvas.width,
+        captureCanvas.height
+      );
+
+      captureCanvas.toBlob(
+        blob => {
+          // 別のカメラセッションに属する処理は破棄する。
+          if (mySession !== sessionId) {
+            return;
+          }
+
+          captureInProgress = false;
+
+          // 画像サイズなどの変更前に撮った画像は保存しない。
+          if (
+            !running ||
+            epochAtCapture !== bufferEpoch ||
+            !blob
+          ) {
+            return;
+          }
+
+          frames.push({
+            index: nextFrameIndex++,
+            time: capturedAt,
+            blob
+          });
+
+          pruneBuffer();
+        },
+        "image/jpeg",
+        0.78
+      );
+    } catch (error) {
+      captureInProgress = false;
+      console.error("フレーム取得エラー:", error);
+    }
+  }
+
+  function startCaptureLoop(mySession) {
+    lastCaptureAt = 0;
+    lastObservedVideoTime = -1;
+
+    // 対応ブラウザでは、実際に動画フレームが更新されたタイミングを使う。
+    if (typeof video.requestVideoFrameCallback === "function") {
+      const onVideoFrame = now => {
+        if (!running || mySession !== sessionId) {
+          return;
         }
-      }
 
-      if (direction === 'up') return zoomLevels[Math.min(zoomLevels.length - 1, nearest + 1)];
-      return zoomLevels[Math.max(0, nearest - 1)];
+        const maxFps = Number(captureFps.value) || 30;
+        const interval = 1000 / maxFps;
+
+        if (
+          !captureInProgress &&
+          now - lastCaptureAt >= interval
+        ) {
+          lastCaptureAt = now;
+          captureFrame(mySession);
+        }
+
+        videoFrameCallbackId =
+          video.requestVideoFrameCallback(onVideoFrame);
+      };
+
+      videoFrameCallbackId =
+        video.requestVideoFrameCallback(onVideoFrame);
+
+      return;
     }
 
-    async function applyHardwareZoom(value){
-      if (!activeTrack || !supportsTrackZoom) return false;
-
-      try{
-        await activeTrack.applyConstraints({
-          advanced: [{ zoom: value }]
-        });
-        return true;
-      }catch(err){
-        return false;
-      }
-    }
-
-    async function setZoom(nextZoom){
-      const clamped = Math.max(zoomLevels[0], Math.min(zoomLevels[zoomLevels.length - 1], nextZoom));
-      if (Math.abs(clamped - currentZoom) < 0.001) return;
-
-      currentZoom = clamped;
-      updateZoomVisual();
-
-      const ok = await applyHardwareZoom(currentZoom);
-      if (!ok){
-        video.style.transform = `scale(${currentZoom})`;
-      }else{
-        video.style.transform = 'none';
-      }
-    }
-
-    function toggleSwap(){
-      swapped = !swapped;
-
-      if (swapped){
-        videoBtn.style.left = `calc(100% - var(--side) - var(--btn))`;
-        photoBtn.style.left = `var(--side)`;
-      }else{
-        videoBtn.style.left = `var(--side)`;
-        photoBtn.style.left = `calc(100% - var(--side) - var(--btn))`;
-      }
-    }
-
-    function updateMemoryButton(){
-      memorySaveBtn.textContent = `メモリ保存 ${memoryItems.length}`;
-    }
-
-    function addToMemory(kind, blob, filename){
-      memoryItems.push({
-        kind,
-        blob,
-        filename,
-        type: blob.type || ''
-      });
-      updateMemoryButton();
-    }
-
-    function clearMemory(){
-      memoryItems.length = 0;
-      updateMemoryButton();
-    }
-
-    function pickRecorderFormat(){
-      if (!window.MediaRecorder) return { mimeType: '', ext: 'webm' };
-
-      const candidates = [
-        { mimeType: 'video/mp4', ext: 'mp4' },
-        { mimeType: 'video/mp4;codecs=h264,aac', ext: 'mp4' },
-        { mimeType: 'video/webm;codecs=vp9,opus', ext: 'webm' },
-        { mimeType: 'video/webm;codecs=vp8,opus', ext: 'webm' },
-        { mimeType: 'video/webm;codecs=vp9', ext: 'webm' },
-        { mimeType: 'video/webm;codecs=vp8', ext: 'webm' },
-        { mimeType: 'video/webm', ext: 'webm' }
-      ];
-
-      for (const item of candidates){
-        try{
-          if (MediaRecorder.isTypeSupported(item.mimeType)) return item;
-        }catch(e){}
-      }
-
-      return { mimeType: '', ext: 'webm' };
-    }
-
-    function downloadBlob(blob, filename){
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 3000);
-    }
-
-    async function saveMemory(){
-      if (!memoryItems.length){
-        showMessage('保存するものがまだないよ');
+    // requestVideoFrameCallback 非対応ブラウザ用。
+    const fallbackLoop = now => {
+      if (!running || mySession !== sessionId) {
         return;
       }
 
-      const files = memoryItems.map(item => new File([item.blob], item.filename, {
-        type: item.type || item.blob.type || 'application/octet-stream'
-      }));
+      const videoTime = video.currentTime;
+      const newVideoFrame = videoTime !== lastObservedVideoTime;
 
-      try{
-        if (navigator.canShare && navigator.share && navigator.canShare({ files })){
-          await navigator.share({
-            files,
-            title: 'Camera Memory',
-            text: '保存した写真と動画'
-          });
-          clearMemory();
-          showMessage('メモリから保存したよ', 1600);
-          return;
+      if (newVideoFrame) {
+        lastObservedVideoTime = videoTime;
+
+        const maxFps = Number(captureFps.value) || 30;
+        const interval = 1000 / maxFps;
+
+        if (
+          !captureInProgress &&
+          now - lastCaptureAt >= interval
+        ) {
+          lastCaptureAt = now;
+          captureFrame(mySession);
         }
-      }catch(err){
-        console.log('share failed', err);
       }
 
-      for (const item of memoryItems){
-        downloadBlob(item.blob, item.filename);
-        await new Promise(r => setTimeout(r, 140));
-      }
-      clearMemory();
-      showMessage('保存を開始したよ', 1600);
+      captureAnimationFrameId =
+        requestAnimationFrame(fallbackLoop);
+    };
+
+    captureAnimationFrameId =
+      requestAnimationFrame(fallbackLoop);
+  }
+
+  function selectDelayedFrame(now) {
+    if (frames.length === 0) {
+      return null;
     }
 
-    function drawZoomedFrameToCanvas(canvas, sourceVideo, zoom){
-      const ctx = canvas.getContext('2d', { willReadFrequently: false });
-      const vw = sourceVideo.videoWidth;
-      const vh = sourceVideo.videoHeight;
+    if (delayMode.value === "frames") {
+      const count = clampNumber(
+        delayFrames,
+        0,
+        1800,
+        60
+      );
 
-      if (!vw || !vh) return false;
+      // 0 = 最新フレーム、1 = 1フレーム前。
+      const targetPosition = frames.length - 1 - count;
 
-      canvas.width = vw;
-      canvas.height = vh;
-
-      if (zoom <= 1){
-        ctx.drawImage(sourceVideo, 0, 0, vw, vh);
-        return true;
+      if (targetPosition < 0) {
+        return null;
       }
 
-      const cropW = vw / zoom;
-      const cropH = vh / zoom;
-      const sx = Math.max(0, (vw - cropW) / 2);
-      const sy = Math.max(0, (vh - cropH) / 2);
-
-      ctx.drawImage(sourceVideo, sx, sy, cropW, cropH, 0, 0, vw, vh);
-      return true;
+      return frames[targetPosition];
     }
 
-    function formatDate(){
-      const d = new Date();
-      const pad = n => String(n).padStart(2, '0');
-      return (
-        d.getFullYear() +
-        pad(d.getMonth() + 1) +
-        pad(d.getDate()) + '_' +
-        pad(d.getHours()) +
-        pad(d.getMinutes()) +
-        pad(d.getSeconds())
+    const seconds = clampNumber(
+      delaySeconds,
+      0,
+      30,
+      2
+    );
+
+    const targetTime = now - seconds * 1000;
+
+    // 指定時刻以前で最も新しいフレームを探す。
+    for (let i = frames.length - 1; i >= 0; i--) {
+      if (frames[i].time <= targetTime) {
+        return frames[i];
+      }
+    }
+
+    return null;
+  }
+
+  async function decodeBlob(blob) {
+    if (typeof createImageBitmap === "function") {
+      const bitmap = await createImageBitmap(blob);
+
+      return {
+        source: bitmap,
+        close() {
+          bitmap.close();
+        }
+      };
+    }
+
+    // createImageBitmap 非対応環境用の代替処理。
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(blob);
+      const image = new Image();
+
+      image.onload = () => {
+        URL.revokeObjectURL(url);
+
+        resolve({
+          source: image,
+          close() {}
+        });
+      };
+
+      image.onerror = () => {
+        URL.revokeObjectURL(url);
+        reject(new Error("画像を読み込めませんでした。"));
+      };
+
+      image.src = url;
+    });
+  }
+
+  async function displayFrame(target, mySession) {
+    if (decodeBusy) {
+      return;
+    }
+
+    decodeBusy = true;
+
+    let decoded = null;
+
+    try {
+      decoded = await decodeBlob(target.blob);
+
+      if (
+        !running ||
+        mySession !== sessionId
+      ) {
+        return;
+      }
+
+      // デコード中に表示対象が変わっていたら古い画像は描画しない。
+      if (
+        !desiredTarget ||
+        desiredTarget.index !== target.index
+      ) {
+        return;
+      }
+
+      const image = decoded.source;
+
+      if (
+        outputCanvas.width !== image.width ||
+        outputCanvas.height !== image.height
+      ) {
+        outputCanvas.width = image.width;
+        outputCanvas.height = image.height;
+      }
+
+      outputContext.drawImage(
+        image,
+        0,
+        0,
+        outputCanvas.width,
+        outputCanvas.height
+      );
+
+      displayedIndex = target.index;
+      screen.classList.add("has-image");
+
+    } catch (error) {
+      console.error("遅延映像の描画エラー:", error);
+
+      if (mySession === sessionId) {
+        setStatus("画像のデコードに失敗しました", true);
+      }
+    } finally {
+      if (decoded) {
+        decoded.close();
+      }
+
+      decodeBusy = false;
+    }
+  }
+
+  function updateWaitingMessage(now) {
+    if (!running) {
+      setPlaceholder(
+        "カメラを起動しよう",
+        "「カメラを開始」を押すと、指定した遅延時間の映像が表示されるよ。"
+      );
+      return;
+    }
+
+    if (frames.length === 0) {
+      setPlaceholder(
+        "映像を取得中…",
+        "カメラの映像を読み込んでいます。"
+      );
+      return;
+    }
+
+    if (delayMode.value === "frames") {
+      const count = clampNumber(
+        delayFrames,
+        0,
+        1800,
+        60
+      );
+
+      const remaining = Math.max(
+        0,
+        count + 1 - frames.length
+      );
+
+      setPlaceholder(
+        "バッファを蓄積中…",
+        remaining > 0
+          ? `あと約 ${remaining} フレーム取得すると表示できます。`
+          : "表示するフレームを準備しています。"
+      );
+
+      return;
+    }
+
+    const delay = clampNumber(
+      delaySeconds,
+      0,
+      30,
+      2
+    );
+
+    const coverage = Math.max(
+      0,
+      (frames[frames.length - 1].time - frames[0].time) / 1000
+    );
+
+    const remaining = Math.max(0, delay - coverage);
+
+    setPlaceholder(
+      "バッファを蓄積中…",
+      remaining > 0.05
+        ? `遅延映像を準備しています。あと約 ${remaining.toFixed(1)} 秒で表示できます。`
+        : "遅延映像を準備しています。"
+    );
+  }
+
+  function updateStats(now) {
+    if (!running) {
+      statsElement.textContent = "バッファ：0 フレーム";
+      return;
+    }
+
+    let measuredFps = 0;
+
+    if (frames.length >= 2) {
+      const last = frames.length - 1;
+      const span = Math.min(30, last);
+
+      const elapsed =
+        frames[last].time - frames[last - span].time;
+
+      if (elapsed > 0) {
+        measuredFps = span * 1000 / elapsed;
+      }
+    }
+
+    const fpsText = measuredFps > 0
+      ? `${measuredFps.toFixed(1)} FPS`
+      : "計測中";
+
+    statsElement.textContent =
+      `バッファ：${frames.length} フレーム · 実測 ${fpsText}`;
+
+    setStatus(
+      `接続中 · ${currentDelayDescription()}`
+    );
+  }
+
+  function renderLoop(mySession) {
+    if (!running || mySession !== sessionId) {
+      return;
+    }
+
+    const now = performance.now();
+    const target = selectDelayedFrame(now);
+
+    if (target) {
+      desiredTarget = target;
+
+      if (target.index === displayedIndex) {
+        screen.classList.add("has-image");
+      } else {
+        displayFrame(target, mySession);
+      }
+    } else {
+      screen.classList.remove("has-image");
+      updateWaitingMessage(now);
+    }
+
+    if (now - lastStatusUpdate >= 350) {
+      lastStatusUpdate = now;
+      updateStats(now);
+    }
+
+    renderAnimationFrameId =
+      requestAnimationFrame(() => renderLoop(mySession));
+  }
+
+  function stopCamera() {
+    // 非同期処理が以前のセッションのものかどうか判別する。
+    sessionId++;
+
+    running = false;
+
+    if (
+      videoFrameCallbackId !== null &&
+      typeof video.cancelVideoFrameCallback === "function"
+    ) {
+      video.cancelVideoFrameCallback(videoFrameCallbackId);
+    }
+
+    videoFrameCallbackId = null;
+
+    if (captureAnimationFrameId !== null) {
+      cancelAnimationFrame(captureAnimationFrameId);
+    }
+
+    captureAnimationFrameId = null;
+
+    if (renderAnimationFrameId !== null) {
+      cancelAnimationFrame(renderAnimationFrameId);
+    }
+
+    renderAnimationFrameId = null;
+
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+    }
+
+    stream = null;
+
+    video.pause();
+    video.srcObject = null;
+
+    captureInProgress = false;
+    lastCaptureAt = 0;
+    nextFrameIndex = 0;
+
+    bufferEpoch++;
+    frames = [];
+
+    resetOutput();
+
+    startButton.disabled = false;
+    stopButton.disabled = true;
+
+    setStatus("停止中");
+    statsElement.textContent = "バッファ：0 フレーム";
+
+    setPlaceholder(
+      "カメラを停止しました",
+      "もう一度「カメラを開始」を押すと再開できるよ。"
+    );
+  }
+
+  async function refreshCameraList(preferredId = "") {
+    if (
+      !navigator.mediaDevices ||
+      typeof navigator.mediaDevices.enumerateDevices !== "function"
+    ) {
+      return;
+    }
+
+    try {
+      const devices =
+        await navigator.mediaDevices.enumerateDevices();
+
+      const cameras = devices.filter(
+        device => device.kind === "videoinput"
+      );
+
+      const activeDeviceId = stream
+        ? stream.getVideoTracks()[0]?.getSettings?.().deviceId || ""
+        : "";
+
+      const wantedId =
+        preferredId ||
+        cameraSelect.value ||
+        activeDeviceId;
+
+      cameraSelect.replaceChildren();
+
+      const defaultOption = document.createElement("option");
+      defaultOption.value = "";
+      defaultOption.textContent = "既定のカメラ";
+      cameraSelect.appendChild(defaultOption);
+
+      cameras.forEach((camera, index) => {
+        const option = document.createElement("option");
+
+        option.value = camera.deviceId;
+        option.textContent =
+          camera.label || `カメラ ${index + 1}`;
+
+        cameraSelect.appendChild(option);
+      });
+
+      if (
+        wantedId &&
+        cameras.some(camera => camera.deviceId === wantedId)
+      ) {
+        cameraSelect.value = wantedId;
+      }
+
+    } catch (error) {
+      console.warn("カメラ一覧を取得できませんでした:", error);
+    }
+  }
+
+  async function startCamera() {
+    stopCamera();
+
+    const mySession = sessionId;
+
+    if (
+      !navigator.mediaDevices ||
+      typeof navigator.mediaDevices.getUserMedia !== "function"
+    ) {
+      setStatus("カメラを利用できません", true);
+
+      setPlaceholder(
+        "カメラにアクセスできないよ",
+        "HTTPS または localhost でページを開いているか確認してね。"
+      );
+
+      return;
+    }
+
+    startButton.disabled = true;
+
+    setStatus("カメラに接続中…");
+
+    setPlaceholder(
+      "カメラに接続中…",
+      "ブラウザのカメラ使用許可を確認してね。"
+    );
+
+    const selectedDevice = cameraSelect.value;
+
+    const videoConstraints = {
+      width: { ideal: 1280 },
+      height: { ideal: 720 },
+      frameRate: { ideal: 30, max: 60 }
+    };
+
+    if (selectedDevice) {
+      videoConstraints.deviceId = {
+        exact: selectedDevice
+      };
+    }
+
+    try {
+      const newStream =
+        await navigator.mediaDevices.getUserMedia({
+          video: videoConstraints,
+          audio: false
+        });
+
+      if (mySession !== sessionId) {
+        newStream.getTracks().forEach(track => track.stop());
+        return;
+      }
+
+      stream = newStream;
+      video.srcObject = stream;
+      video.muted = true;
+      video.playsInline = true;
+
+      await video.play();
+
+      // 最初の映像データを待つ。
+      if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+        await new Promise((resolve, reject) => {
+          video.addEventListener(
+            "loadeddata",
+            resolve,
+            { once: true }
+          );
+
+          video.addEventListener(
+            "error",
+            reject,
+            { once: true }
+          );
+        });
+      }
+
+      if (mySession !== sessionId) {
+        return;
+      }
+
+      configureCaptureCanvas();
+
+      bufferEpoch++;
+      frames = [];
+      nextFrameIndex = 0;
+
+      captureInProgress = false;
+      lastCaptureAt = 0;
+      displayedIndex = -1;
+      desiredTarget = null;
+
+      running = true;
+
+      startButton.disabled = false;
+      stopButton.disabled = false;
+
+      setStatus("映像取得中…");
+
+      setPlaceholder(
+        "バッファを蓄積中…",
+        "指定した遅延時間ぶんの映像を取得しています。"
+      );
+
+      // 許可後にカメラ名が取得できるブラウザに対応。
+      refreshCameraList(
+        stream.getVideoTracks()[0]?.getSettings?.().deviceId || selectedDevice
+      );
+
+      startCaptureLoop(mySession);
+
+      lastStatusUpdate = 0;
+
+      renderAnimationFrameId =
+        requestAnimationFrame(() => renderLoop(mySession));
+
+    } catch (error) {
+      if (mySession !== sessionId) {
+        return;
+      }
+
+      console.error("カメラ接続エラー:", error);
+
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+
+      stream = null;
+      running = false;
+      video.srcObject = null;
+
+      startButton.disabled = false;
+      stopButton.disabled = true;
+
+      let message =
+        "カメラを開始できませんでした。カメラの使用許可や接続状態を確認してね。";
+
+      if (error.name === "NotAllowedError" ||
+          error.name === "PermissionDeniedError") {
+        message =
+          "カメラの使用が許可されていないみたい。ブラウザや端末の設定を確認してね。";
+      } else if (error.name === "NotFoundError") {
+        message =
+          "利用可能なカメラが見つからなかったよ。";
+      } else if (error.name === "NotReadableError") {
+        message =
+          "カメラを利用できなかったよ。別のアプリがカメラを使用中でないか確認してね。";
+      } else if (error.name === "OverconstrainedError") {
+        message =
+          "選択したカメラを利用できなかったよ。別のカメラを選んで試してね。";
+      }
+
+      setStatus("接続エラー", true);
+
+      setPlaceholder(
+        "カメラを開始できなかったよ",
+        message
       );
     }
+  }
 
-    async function capturePhoto(){
-      if (!video.videoWidth || !video.videoHeight){
-        showMessage('まだカメラの準備中だよ');
-        return;
-      }
+  function updateModeUI() {
+    const useFrames = delayMode.value === "frames";
 
-      const ok = drawZoomedFrameToCanvas(hiddenCanvas, video, currentZoom);
-      if (!ok){
-        showMessage('写真を撮れなかった');
-        return;
-      }
+    secondsField.hidden = useFrames;
+    framesField.hidden = !useFrames;
 
-      hiddenCanvas.toBlob((blob) => {
-        if (!blob){
-          showMessage('写真の保存に失敗した');
-          return;
-        }
-        const filename = `photo_${formatDate()}.jpg`;
-        addToMemory('photo', blob, filename);
-        showMessage('写真をメモリに入れたよ', 1200);
-      }, 'image/jpeg', 0.95);
+    if (!running) {
+      setStatus("準備完了");
+    }
+  }
+
+  // モードと遅延量は、動作中でも変更できる。
+  delayMode.addEventListener("change", () => {
+    updateModeUI();
+  });
+
+  delaySeconds.addEventListener("input", () => {
+    pruneBuffer();
+  });
+
+  delayFrames.addEventListener("input", () => {
+    pruneBuffer();
+  });
+
+  captureFps.addEventListener("change", () => {
+    pruneBuffer();
+  });
+
+  // 画像サイズの変更時はバッファを作り直す。
+  imageSize.addEventListener("change", () => {
+    if (!running) {
+      return;
     }
 
-    function startRecording(){
-      if (!stream){
-        showMessage('カメラの準備がまだだよ');
-        return;
-      }
-      if (!window.MediaRecorder){
-        showMessage('このブラウザは動画録画に対応していないかも');
-        return;
-      }
-      if (isRecording) return;
+    configureCaptureCanvas();
+    resetFrameBuffer();
 
-      const format = pickRecorderFormat();
-      try{
-        mediaRecorder = format.mimeType
-          ? new MediaRecorder(stream, { mimeType: format.mimeType })
-          : new MediaRecorder(stream);
-      }catch(err){
-        console.error(err);
-        showMessage('動画録画を開始できなかった');
-        return;
-      }
+    setStatus("新しい画像サイズで取得中…");
+  });
 
-      recordedChunks = [];
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data && e.data.size > 0){
-          recordedChunks.push(e.data);
-        }
-      };
-
-      mediaRecorder.onstop = () => {
-        const type = mediaRecorder && mediaRecorder.mimeType ? mediaRecorder.mimeType : (format.mimeType || 'video/webm');
-        const blob = new Blob(recordedChunks, { type });
-
-        if (blob.size > 0){
-          const ext = format.ext || (type.includes('mp4') ? 'mp4' : 'webm');
-          const filename = `video_${formatDate()}.${ext}`;
-          addToMemory('video', blob, filename);
-          showMessage('動画をメモリに入れたよ', 1200);
-        }else{
-          showMessage('録画データが空だった');
-        }
-      };
-
-      try{
-        mediaRecorder.start();
-        isRecording = true;
-        videoBtn.classList.add('recording');
-        showMessage('録画スタート', 1000);
-      }catch(err){
-        console.error(err);
-        showMessage('録画開始に失敗した');
-      }
+  cameraSelect.addEventListener("change", () => {
+    if (running) {
+      startCamera();
     }
+  });
 
-    function stopRecording(){
-      if (!mediaRecorder || !isRecording) return;
-      try{
-        mediaRecorder.stop();
-      }catch(err){
-        console.error(err);
-      }
-      isRecording = false;
-      videoBtn.classList.remove('recording');
-      showMessage('録画ストップ', 1000);
-    }
+  startButton.addEventListener("click", startCamera);
+  stopButton.addEventListener("click", stopCamera);
 
-    function toggleRecording(){
-      if (isRecording) stopRecording();
-      else startRecording();
-    }
+  window.addEventListener("beforeunload", stopCamera);
 
-    async function stopStream(){
-      if (stream){
-        stream.getTracks().forEach(t => t.stop());
-        stream = null;
-        activeTrack = null;
-        supportsTrackZoom = false;
-        hardwareZoomAvailable = false;
-        hardwareZoomMin = 1;
-        hardwareZoomMax = 1;
-      }
-    }
-
-    async function startCamera(facingMode = 'environment'){
-      await stopStream();
-
-      try{
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: { ideal: facingMode },
-            width: { ideal: 1920 },
-            height: { ideal: 1080 }
-          },
-          audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true
-          }
-        });
-
-        video.srcObject = stream;
-        await video.play();
-
-        const tracks = stream.getVideoTracks();
-        activeTrack = tracks && tracks[0] ? tracks[0] : null;
-
-        supportsTrackZoom = false;
-        hardwareZoomAvailable = false;
-
-        if (activeTrack && activeTrack.getCapabilities){
-          const cap = activeTrack.getCapabilities();
-          supportsTrackZoom = typeof cap.zoom !== 'undefined';
-
-          if (supportsTrackZoom && cap.zoom){
-            hardwareZoomAvailable = true;
-            hardwareZoomMin = typeof cap.zoom.min === 'number' ? cap.zoom.min : 1;
-            hardwareZoomMax = typeof cap.zoom.max === 'number' ? cap.zoom.max : 1;
-          }
-        }
-
-        updateZoomVisual();
-
-        const ok = await applyHardwareZoom(currentZoom);
-        if (!ok){
-          video.style.transform = `scale(${currentZoom})`;
-        }else{
-          video.style.transform = 'none';
-        }
-
-        showMessage(facingMode === 'user' ? 'インカメラにしたよ' : '外カメラにしたよ', 1000);
-      }catch(err){
-        console.error(err);
-        showMessage('カメラを使えなかった。権限を確認してね');
-      }
-    }
-
-    async function switchCamera(){
-      if (isRecording){
-        stopRecording();
-      }
-      currentFacing = currentFacing === 'environment' ? 'user' : 'environment';
-      await startCamera(currentFacing);
-    }
-
-    function getSwipeDirection(dx, dy){
-      return Math.abs(dx) > Math.abs(dy) ? 'horizontal' : 'vertical';
-    }
-
-    gestureLayer.addEventListener('pointerdown', (e) => {
-      controlsSwipeActive = false;
-      controlsSwipeLocked = false;
-      swipeStartX = e.clientX;
-      swipeStartY = e.clientY;
-    });
-
-    gestureLayer.addEventListener('pointermove', async (e) => {
-      if (controlsSwipeLocked) return;
-
-      const dx = e.clientX - swipeStartX;
-      const dy = e.clientY - swipeStartY;
-
-      if (Math.abs(dx) < 16 && Math.abs(dy) < 16) return;
-
-      if (getSwipeDirection(dx, dy) === 'vertical'){
-        const distance = dy;
-        const steps = Math.floor(Math.abs(distance) / 70);
-
-        if (steps >= 1){
-          controlsSwipeLocked = true;
-          const dir = distance < 0 ? 'up' : 'down';
-          const nextZoom = getNextZoom(dir);
-          await setZoom(nextZoom);
-        }
-      }
-    });
-
-    controls.addEventListener('pointerdown', (e) => {
-      if (e.target.closest('button')) return;
-
-      controlsSwipeActive = true;
-      controlsSwipeLocked = false;
-      swipeStartX = e.clientX;
-      swipeStartY = e.clientY;
-    });
-
-    controls.addEventListener('pointermove', (e) => {
-      if (!controlsSwipeActive || controlsSwipeLocked) return;
-
-      const dx = e.clientX - swipeStartX;
-      const dy = e.clientY - swipeStartY;
-
-      if (Math.abs(dx) < 18 && Math.abs(dy) < 18) return;
-
-      if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)){
-        controlsSwipeLocked = true;
-        toggleSwap();
-      }
-    });
-
-    controls.addEventListener('pointerup', () => {
-      controlsSwipeActive = false;
-      controlsSwipeLocked = false;
-    });
-
-    controls.addEventListener('pointercancel', () => {
-      controlsSwipeActive = false;
-      controlsSwipeLocked = false;
-    });
-
-    videoBtn.addEventListener('click', toggleRecording);
-    photoBtn.addEventListener('click', capturePhoto);
-    switchBtn.addEventListener('click', switchCamera);
-    memorySaveBtn.addEventListener('click', saveMemory);
-
-    zoomPill.addEventListener('click', async () => {
-      await setZoom(1);
-      showMessage('ズームを1倍に戻したよ', 900);
-    });
-
-    window.addEventListener('beforeunload', () => {
-      if (mediaRecorder && mediaRecorder.state === 'recording'){
-        try{ mediaRecorder.stop(); }catch(e){}
-      }
-      if (stream){
-        stream.getTracks().forEach(t => t.stop());
-      }
-    });
-
-    updateMemoryButton();
-    updateZoomLabel();
-    startCamera(currentFacing);
-  </script>
+  updateModeUI();
+  refreshCameraList();
+})();
+</script>
 </body>
 </html>
